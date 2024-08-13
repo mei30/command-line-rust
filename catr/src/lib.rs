@@ -49,21 +49,32 @@ pub fn get_args() -> MyResult<Config> {
 }
 
 pub fn run(config: Config) -> MyResult<()> {
+    let mut number = 0;
     for (index , file) in config.files.iter().enumerate() {
         let text: String = fs::read_to_string(file)?;
-        println!("{}", text);
 
         let mut text_index = 0;
         let mut line_break_index = 0;
-        while text_index <= text.len() {
-            let substring: &str = &text[text_index + line_break_index..];
+
+        loop {
+            let substring: &str = &text[text_index..];
 
             line_break_index = match substring.find('\n') {
                 Some(value) => value,
-                None => text.len()
+                None => substring.len()
             };
 
-            let text_slice: &str = &text[(text_index + 1)..line_break_index];
+            let text_slice: &str = &substring[..line_break_index];
+
+            print!("{}\n", text_slice);
+
+            text_index = text_index + line_break_index + 1;
+
+            if text_index >= text.len() {
+                print!("{}-{}\n", text_index, text.len());
+                break;
+            }
+
         } 
     }
 
