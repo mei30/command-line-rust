@@ -1,7 +1,9 @@
-use std::error::Error;
-use std::fs;
+use std::fs::File;
+use std::io::BufRead;
+use std::{error::Error, io::BufReader};
+use std::io;
 
-use clap::{Arg, App};
+use clap::{App, Arg};
 
 type MyResult<T> = Result<T, Box<dyn Error>>;
 
@@ -9,7 +11,7 @@ type MyResult<T> = Result<T, Box<dyn Error>>;
 pub struct Config {
     files: Vec<String>,
     number_lines: bool,
-    number_nonblank_lines: bool
+    number_nonblank_lines: bool,
 }
 
 pub fn get_args() -> MyResult<Config> {
@@ -19,65 +21,68 @@ pub fn get_args() -> MyResult<Config> {
         .about("Rust cat")
         .arg(
             Arg::with_name("files")
-            .value_name("FILE")
-            .help("Input File(s)")
-            .multiple(true)
-            .default_value("-"),
+                .value_name("FILE")
+                .help("Input File(s)")
+                .multiple(true)
+                .default_value("-"),
         )
         .arg(
             Arg::with_name("number")
-            .short("n")
-            .long("number")
-            .help("Number lines")
-            .takes_value(false)
-            .conflicts_with("number_nonblank")
+                .short("n")
+                .long("number")
+                .help("Number lines")
+                .takes_value(false)
+                .conflicts_with("number_nonblank"),
         )
         .arg(
             Arg::with_name("number_nonblank")
-            .short("b")
-            .long("number_nonblank")
-            .help("Number non-blank lines")
-            .takes_value(false)
+                .short("b")
+                .long("number_nonblank")
+                .help("Number non-blank lines")
+                .takes_value(false),
         )
         .get_matches();
 
     Ok(Config {
         files: matches.values_of_lossy("files").unwrap(),
         number_lines: matches.is_present("number"),
-        number_nonblank_lines: matches.is_present("number_nonblank")
+        number_nonblank_lines: matches.is_present("number_nonblank"),
     })
 }
 
-pub fn run(config: Config) -> MyResult<()> {
-    let mut number = 0;
-    for (index , file) in config.files.iter().enumerate() {
-        let text: String = fs::read_to_string(file)?;
-
-        let mut text_index = 0;
-        let mut line_break_index = 0;
-
-        loop {
-            let substring: &str = &text[text_index..];
-
-            line_break_index = match substring.find('\n') {
-                Some(value) => value,
-                None => substring.len()
-            };
-
-            let text_slice: &str = &substring[..line_break_index];
-
-            print!("{}\n", text_slice);
-
-            text_index = text_index + line_break_index + 1;
-
-            if text_index >= text.len() {
-                print!("{}-{}\n", text_index, text.len());
-                break;
-            }
-
-        } 
+fn open(filename: &str) -> MyResult<Box<dyn BufRead>> {
+    match filename {
+        "-" => Ok(Box::new(BufReader::new(io::stdin()))),
+        _ => Ok(Box::new(BufReader::new(File::open(filename)?))),
     }
+}
 
+pub fn run(config: Config) -> MyResult<()> {
+    let mut number = 1;
+    for filename in config.files {
+        match open(&filename) {
+            Err(err) => eprintln!("Failed to open file {}: {}", filename, err),
+            Ok(buffer) => {
+                for line in buffer.lines() {
+                    let mut formatted_string = line.unwrap();
+                    if config.number_lines {
+                        formatted_string = format!("{} {}\n", number, formatted_string);
+                        number += 1;
+                    }
 
+                    if config.number_nonblank_lines {
+                        if formatted_string.len() == 0 {
+                            formatted_string = format!("{}\n", formatted_string);
+                        } else {
+                            formatted_string = format!("{} {}\n", number, formatted_string);
+                            number += 1;
+                        }
+                    }
+
+                    print!("{}", formatted_string);
+                }
+            }
+        }
+    }
     Ok(())
 }
