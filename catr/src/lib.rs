@@ -1,7 +1,7 @@
 use std::fs::File;
+use std::io;
 use std::io::BufRead;
 use std::{error::Error, io::BufReader};
-use std::io;
 
 use clap::{App, Arg};
 
@@ -58,28 +58,27 @@ fn open(filename: &str) -> MyResult<Box<dyn BufRead>> {
 }
 
 pub fn run(config: Config) -> MyResult<()> {
-    let mut number = 1;
+    let mut last_number = 0;
     for filename in config.files {
         match open(&filename) {
-            Err(err) => eprintln!("Failed to open file {}: {}", filename, err),
+            Err(err) => eprintln!("{}: {}", filename, err),
             Ok(buffer) => {
                 for line in buffer.lines() {
-                    let mut formatted_string = line.unwrap();
+                    let line = line?;
+
                     if config.number_lines {
-                        formatted_string = format!("{} {}\n", number, formatted_string);
-                        number += 1;
-                    }
-
-                    if config.number_nonblank_lines {
-                        if formatted_string.len() == 0 {
-                            formatted_string = format!("{}\n", formatted_string);
+                        last_number += 1;
+                        println!("{:>6}\t{}", last_number, line)
+                    } else if config.number_nonblank_lines {
+                        if !line.is_empty() {
+                            last_number += 1;
+                            println!("{:>6}\t{}", last_number, line)
                         } else {
-                            formatted_string = format!("{} {}\n", number, formatted_string);
-                            number += 1;
+                            println!();
                         }
+                    } else {
+                        println!("{}", line);
                     }
-
-                    print!("{}", formatted_string);
                 }
             }
         }
