@@ -29,7 +29,7 @@ pub fn get_args() -> MyResult<Config> {
         .arg(
             Arg::with_name("lines")
                 .value_name("lines")
-                .short("-l")
+                .short("-n")
                 .long("lines")
                 .help("Number of lines")
                 .default_value("10"),
@@ -41,7 +41,7 @@ pub fn get_args() -> MyResult<Config> {
                 .long("bytes")
                 .takes_value(true)
                 .conflicts_with("lines")
-                .help("Number of Bytes")
+                .help("Number of Bytes"),
         )
         .get_matches();
 
@@ -60,7 +60,7 @@ pub fn get_args() -> MyResult<Config> {
     Ok(Config {
         files: matches.values_of_lossy("files").unwrap(),
         lines: lines.unwrap(),
-        bytes: bytes 
+        bytes: bytes,
     })
 }
 
@@ -79,5 +79,40 @@ fn open(filename: &str) -> MyResult<Box<dyn BufRead>> {
 }
 
 pub fn run(config: Config) -> MyResult<()> {
+    let num_files = config.files.len();
+
+    for (file_num, filename) in config.files.iter().enumerate() {
+        match open(filename) {
+            Err(err) => eprintln!("{filename}: {err}"),
+            Ok(mut file) => {
+                if num_files > 1 {
+                    println!(
+                        "{}==> {filename} <==",
+                        if file_num > 0 { "\n" } else { "" },
+                    );
+                }
+
+                if let Some(num_bytes) = config.bytes {
+                    let mut buffer = vec![0; num_bytes as usize];
+                    let bytes_read = file.read(&mut buffer)?;
+                    print!(
+                        "{}",
+                        String::from_utf8_lossy(&buffer[..bytes_read])
+                    );
+                } else {
+                    let mut line = String::new();
+                    for _ in 0..config.lines {
+                        let bytes = file.read_line(&mut line)?;
+                        if bytes == 0 {
+                            break;
+                        }
+                        print!("{line}");
+                        line.clear();
+                    }
+                }
+            }
+        }
+    }
+
     Ok(())
 }
