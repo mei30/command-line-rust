@@ -147,7 +147,7 @@ fn run_stdin(test: &Test) -> Result<()> {
         .expect("fail");
     assert!(output.status.success());
 
-    let stdout = String::from_utf8(output.stdout).expect("invalid UTF-8");
+    let stdout = String::from_utf8_lossy(&output.stdout);
     assert_eq!(stdout, expected);
     Ok(())
 }
